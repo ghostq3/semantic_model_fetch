@@ -1,159 +1,111 @@
 import streamlit as st
 import requests
 import pandas as pd
-import plotly.express as px
 
 # ----------------------------
-# 🔐 Secrets (Streamlit Cloud)
+# 🔐 Secrets (from Streamlit)
 # ----------------------------
 TENANT_ID = st.secrets["FABRIC_TENANT_ID"]
 CLIENT_ID = st.secrets["FABRIC_CLIENT_ID"]
 CLIENT_SECRET = st.secrets["FABRIC_CLIENT_SECRET"]
+RESOURCE = "https://analysis.windows.net/powerbi/api"
 
 WORKSPACE_ID = "9755694b-649e-4a01-8386-eee2bd91079e"
 DATASET_ID = "5b64ca41-91bd-4db4-b005-0c0327887b5e"
 
-RESOURCE = "https://analysis.windows.net/powerbi/api"
-AUTH_URL = f"https://login.microsoftonline.com/{TENANT_ID}/oauth2/token"
-
-# ----------------------------
-# ⚙️ Get Access Token
-# ----------------------------
+# -------------------------------------
+# 🔑 Step 1. Get Access Token
+# -------------------------------------
 def get_access_token():
-    payload = {
+    url = f"https://login.microsoftonline.com/{TENANT_ID}/oauth2/token"
+    data = {
         "grant_type": "client_credentials",
         "client_id": CLIENT_ID,
         "client_secret": CLIENT_SECRET,
         "resource": RESOURCE
     }
-    response = requests.post(AUTH_URL, data=payload)
+    response = requests.post(url, data=data)
     response.raise_for_status()
     return response.json()["access_token"]
 
-# ----------------------------
-# 🧠 Run DAX Query
-# ----------------------------
-def run_dax_query(query, token):
+# -------------------------------------
+# 📊 Step 2. Run DAX Query on Dataset
+# -------------------------------------
+def run_dax_query(access_token, dax_query):
     url = f"https://api.powerbi.com/v1.0/myorg/groups/{WORKSPACE_ID}/datasets/{DATASET_ID}/executeQueries"
     headers = {
-        "Authorization": f"Bearer {token}",
-        "Content-Type": "application/json"
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {access_token}"
     }
-    body = {"queries": [{"query": query}], "serializerSettings": {"includeNulls": True}}
+    body = {"queries": [{"query": dax_query}]}
     response = requests.post(url, headers=headers, json=body)
     response.raise_for_status()
-    result = response.json()
-    tables = result.get("results", [])[0].get("tables", [])
-    if tables:
-        return pd.DataFrame(tables[0]["rows"])
-    else:
-        raise ValueError("No data returned")
+    return response.json()
 
-# ----------------------------
-# 🧩 DAX Query
-# ----------------------------
-DAX_QUERY = """
-EVALUATE
-SELECTCOLUMNS(
-    fact_opportunity,
-    "Region", fact_opportunity[RegionSelector],
-    "MonthYear", RELATED(dim_date[MonthYear]),
-    "Revenue", [Revenue],
-    "Win Rate", [Win Rate],
-    "Average Sales Cycle (Won)", [Average Sales Cycle (Won)],
-    "AI Influenced Win Rate", [AI Influenced Win Rate],
-    "Won Opps #", [Won Opps #],
-    "Average Deal Size", [Average Deal Size],
-    "AI Users", [AI Users],
-    "AI Invocations", [AI Invocations]
-)
-ORDER BY RELATED(dim_date[MonthYear])
-"""
+# -------------------------------------
+# 🧠 Step 3. Convert DAX Result to DataFrame
+# -------------------------------------
+def dax_to_df(result_json):
+    rows = result_json["results"][0]["tables"][0]["rows"]
+    return pd.DataFrame(rows)
 
-# ----------------------------
-# 🚀 Streamlit UI
-# ----------------------------
-st.set_page_config(page_title="AI Sales KPI Dashboard", layout="wide")
-st.title("📊 AI Sales KPI Dashboard (Live from Power BI Semantic Model)")
+# -------------------------------------
+# ⚙️ Step 4. Main Streamlit App
+# -------------------------------------
+st.title("🔗 Power BI Semantic Model – Test Required Fields + Measures")
 
-if st.button("Fetch & Visualize Data"):
-    try:
-        access_token = get_access_token()
-        st.success("✅ Access token acquired successfully!")
+if st.button("Run Data Fetch Test"):
+    with st.spinner("Fetching Power BI data..."):
+        try:
+            token = get_access_token()
 
-        df = run_dax_query(DAX_QUERY, access_token)
-        st.success("✅ Data loaded successfully from semantic model!")
+            # 🗓️ dim_date
+            dax_date = """
+            EVALUATE
+            SELECTCOLUMNS(
+                dim_date,
+                "MonthYear", dim_date[MonthYear],
+                "MonthYear_Sort", dim_date[MonthYear_Sort],
+                "Year", dim_date[Year]
+            )
+            """
+            date_result = run_dax_query(token, dax_date)
+            dim_date_df = dax_to_df(date_result)
+            st.success(f"✅ dim_date loaded ({len(dim_date_df)} rows)")
+            st.dataframe(dim_date_df.head())
 
-        # Clean and prepare data
-        df = df.dropna(subset=["MonthYear"])
-        df["MonthYear"] = pd.Categorical(df["MonthYear"], ordered=True)
-        df = df.sort_values("MonthYear")
+            # 🌍 fact_opportunity (Region only)
+            dax_fact = """
+            EVALUATE
+            SELECTCOLUMNS(
+                fact_opportunity,
+                "Region", fact_opportunity[RegionSelector]
+            )
+            """
+            fact_result = run_dax_query(token, dax_fact)
+            fact_df = dax_to_df(fact_result)
+            st.success(f"✅ fact_opportunity loaded ({len(fact_df)} rows)")
+            st.dataframe(fact_df.head())
 
-        # ----------------------------
-        # 📈 KPI CARDS
-        # ----------------------------
-        latest = df.iloc[-1]
-        col1, col2, col3, col4, col5 = st.columns(5)
-        col1.metric("Revenue", f"${latest['Revenue']:,.0f}")
-        col2.metric("Win Rate", f"{latest['Win Rate']:.1f}%")
-        col3.metric("Avg Sales Cycle", f"{latest['Average Sales Cycle (Won)']:.0f} days")
-        col4.metric("AI Win Rate", f"{latest['AI Influenced Win Rate']:.1f}%")
-        col5.metric("Avg Deal Size", f"${latest['Average Deal Size']:,.0f}")
+            # 🧮 *Measures (includes all KPIs)
+            dax_measures = """
+            EVALUATE
+            ROW(
+                "Revenue", [Revenue],
+                "Win Rate", [Win Rate],
+                "Average Sales Cycle (Won)", [Average Sales Cycle (Won)],
+                "AI Influenced Win Rate", [AI Influenced Win Rate],
+                "Total Opportunities", [Total Opportunities],
+                "Won Opportunities", [Won Opps #],
+                "Average Deal Size", [Average Deal Size],
+                "AI Users", [AI Users],
+                "AI Invocations", [AI Invocations]
+            )
+            """
+            measures_result = run_dax_query(token, dax_measures)
+            measures_df = dax_to_df(measures_result)
+            st.success("✅ *Measures loaded successfully")
+            st.dataframe(measures_df)
 
-        # AI Users & Invocations
-        st.subheader("🧍‍♂️ AI Usage Metrics")
-        col1, col2 = st.columns(2)
-        col1.metric("AI Users", f"{latest['AI Users']:,.0f}")
-        col2.metric("AI Invocations", f"{latest['AI Invocations']:,.0f}")
-
-        # ----------------------------
-        # 📊 SALES TREND
-        # ----------------------------
-        st.subheader("📈 Sales Trend Over Time")
-        fig_sales = px.line(
-            df, x="MonthYear", y="Revenue", color="Region",
-            title="Revenue Trend by Region",
-            markers=True
-        )
-        st.plotly_chart(fig_sales, use_container_width=True)
-
-        # ----------------------------
-        # 💰 WIN RATE BY REGION
-        # ----------------------------
-        st.subheader("💰 Win Rate by Region")
-        latest_win = df.groupby("Region", as_index=False)["Win Rate"].mean()
-        fig_win = px.bar(
-            latest_win, x="Region", y="Win Rate", text_auto=".1f",
-            title="Average Win Rate by Region"
-        )
-        st.plotly_chart(fig_win, use_container_width=True)
-
-        # ----------------------------
-        # 🧠 AI INFLUENCE vs TOTAL DEALS
-        # ----------------------------
-        st.subheader("🧠 AI Influence vs Total Deals")
-        fig_ai = px.scatter(
-            df, x="AI Influenced Win Rate", y="Won Opps #", color="Region",
-            size="Revenue", hover_data=["Average Deal Size"],
-            title="AI Influence vs. Total Opportunities"
-        )
-        st.plotly_chart(fig_ai, use_container_width=True)
-
-        # ----------------------------
-        # ⏱️ AVERAGE SALES CYCLE TREND
-        # ----------------------------
-        st.subheader("⏱️ Average Sales Cycle Trend")
-        fig_cycle = px.line(
-            df, x="MonthYear", y="Average Sales Cycle (Won)", color="Region",
-            title="Average Sales Cycle (Won) Over Time", markers=True
-        )
-        st.plotly_chart(fig_cycle, use_container_width=True)
-
-        # ----------------------------
-        # 📋 RAW DATA
-        # ----------------------------
-        st.subheader("📋 Raw Data Preview")
-        st.dataframe(df)
-
-    except Exception as e:
-        st.error(f"❌ Failed to fetch data: {e}")
+        except Exception as e:
+            st.error(f"❌ Failed to fetch data: {e}")
