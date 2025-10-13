@@ -7,9 +7,9 @@ st.title("🔄 Power BI Dataset Refresh Status")
 # ----------------------------
 # 🔐 Secrets (set in Streamlit)
 # ----------------------------
-TENANT_ID = st.secrets["TENANT_ID"]
-CLIENT_ID = st.secrets["CLIENT_ID"]
-CLIENT_SECRET = st.secrets["CLIENT_SECRET"]
+TENANT_ID = st.secrets["FABRIC_TENANT_ID"]
+CLIENT_ID = st.secrets["FABRIC_CLIENT_ID"]
+CLIENT_SECRET = st.secrets["FABRIC_CLIENT_SECRET"]
 
 WORKSPACE_ID = "205b187c-31f8-4789-bde3-5a92628392a1"
 DATASET_ID = "f5257086-90d3-4106-8e59-6f4b59ad4d19"
