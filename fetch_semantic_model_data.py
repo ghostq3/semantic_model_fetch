@@ -1,104 +1,61 @@
 import streamlit as st
 import requests
-import pandas as pd
+import json
 
-st.title("📊 Power BI Dataset Data Fetcher")
+st.title("🔄 Power BI Dataset Refresh Status")
 
 # ----------------------------
-# 🔐 Secrets (Streamlit Cloud)
+# 🔐 Secrets (set in Streamlit)
 # ----------------------------
-TENANT_ID = st.secrets["FABRIC_TENANT_ID"]
-CLIENT_ID = st.secrets["FABRIC_CLIENT_ID"]
-CLIENT_SECRET = st.secrets["FABRIC_CLIENT_SECRET"]
+TENANT_ID = st.secrets["TENANT_ID"]
+CLIENT_ID = st.secrets["CLIENT_ID"]
+CLIENT_SECRET = st.secrets["CLIENT_SECRET"]
+
+WORKSPACE_ID = "205b187c-31f8-4789-bde3-5a92628392a1"
+DATASET_ID = "f5257086-90d3-4106-8e59-6f4b59ad4d19"
+
 RESOURCE = "https://analysis.windows.net/powerbi/api"
 
-# Workspace & Dataset IDs
-WORKSPACE_ID = "9755694b-649e-4a01-8386-eee2bd91079e"
-DATASET_ID = "5b64ca41-91bd-4db4-b005-0c0327887b5e"
-
-# Tables to include
-INCLUDE_TABLES = [
-    "fact_opportunity",
-    "fact_chatlogs",
-    "dim_date",
-    "chat_analysis",
-    "chatfeedback",
-    "Dim_ProductHierarchy",
-    "Dim_c4c_accounts",
-    "Dim_Emp_Hierarchy_SCD2",
-    "*Measures"
-]
-
 # ----------------------------
-# 🪙 Get Access Token
+# 1️⃣ Get Access Token
 # ----------------------------
-@st.cache_data(ttl=3500)
+@st.cache_data(ttl=3600)
 def get_access_token():
-    url = f"https://login.microsoftonline.com/{TENANT_ID}/oauth2/v2.0/token"
-    payload = {
+    token_url = f"https://login.microsoftonline.com/{TENANT_ID}/oauth2/token"
+    token_data = {
         "grant_type": "client_credentials",
         "client_id": CLIENT_ID,
         "client_secret": CLIENT_SECRET,
-        "scope": f"{RESOURCE}/.default"
+        "resource": RESOURCE
     }
-    res = requests.post(url, data=payload)
+    res = requests.post(token_url, data=token_data)
     res.raise_for_status()
     return res.json()["access_token"]
 
-# ----------------------------
-# 📥 Run DAX Query
-# ----------------------------
-def run_dax_query(query: str):
-    token = get_access_token()
-    url = f"https://api.fabric.microsoft.com/v1.0/myorg/groups/{WORKSPACE_ID}/datasets/{DATASET_ID}"
-    headers = {
-        "Authorization": f"Bearer {token}",
-        "Content-Type": "application/json"
-    }
-    body = {"queries": [{"query": query}]}
-    res = requests.post(url, headers=headers, json=body)
-    res.raise_for_status()
-    result = res.json()
+try:
+    access_token = get_access_token()
+    st.success("✅ Access token acquired")
+except Exception as e:
+    st.error(f"❌ Failed to get token: {e}")
+    st.stop()
 
-    # Handle empty or unexpected results
+# ----------------------------
+# 2️⃣ Fetch last refresh status
+# ----------------------------
+url = f"https://api.powerbi.com/v1.0/myorg/groups/{WORKSPACE_ID}/datasets/{DATASET_ID}/refreshes?$top=1"
+headers = {"Authorization": f"Bearer {access_token}", "Content-Type": "application/json"}
+
+if st.button("🔍 Check Last Refresh Status"):
     try:
-        rows = result["results"][0]["tables"][0]["rows"]
-        return pd.DataFrame(rows)
-    except (KeyError, IndexError):
-        st.warning("⚠️ No data returned or invalid query format.")
-        return pd.DataFrame()
+        r = requests.get(url, headers=headers)
+        r.raise_for_status()
+        data = r.json()
 
-# ----------------------------
-# 🚀 UI
-# ----------------------------
-st.sidebar.header("Settings")
-selected_tables = st.sidebar.multiselect(
-    "Select tables to fetch",
-    INCLUDE_TABLES,
-    default=INCLUDE_TABLES
-)
-
-if st.button("Fetch Selected Tables"):
-    token = get_access_token()
-    st.success("✅ Connected successfully to Power BI.")
-    
-    for table in selected_tables:
-        with st.expander(f"📄 {table}", expanded=False):
-            query = f"EVALUATE {table}" if table != "*Measures" else "EVALUATE SUMMARIZECOLUMNS('Measures'[Name], 'Measures'[Value])"
-            try:
-                df = run_dax_query(query)
-                if not df.empty:
-                    st.dataframe(df, use_container_width=True)
-                    csv = df.to_csv(index=False).encode("utf-8")
-                    st.download_button(
-                        label=f"⬇️ Download {table}.csv",
-                        data=csv,
-                        file_name=f"{table}.csv",
-                        mime="text/csv"
-                    )
-                else:
-                    st.info(f"No data found in {table}.")
-            except Exception as e:
-                st.error(f"❌ Failed to fetch {table}: {str(e)}")
-
-st.caption("🔒 Requires Build permission on the Power BI dataset and Dataset.Read.All API permission in Azure AD.")
+        if data.get("value"):
+            last_refresh = data["value"][0]
+            st.json(last_refresh)
+            st.success(f"✅ Last Refresh Status: {last_refresh['status']}")
+        else:
+            st.warning("No refresh history found.")
+    except Exception as e:
+        st.error(f"❌ Failed to fetch refresh data: {e}")
