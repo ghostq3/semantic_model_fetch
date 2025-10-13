@@ -1,6 +1,7 @@
 import streamlit as st
 import requests
 import pandas as pd
+import plotly.express as px
 
 # ----------------------------
 # 🔐 Secrets (from Streamlit)
@@ -52,14 +53,15 @@ def dax_to_df(result_json):
 # -------------------------------------
 # ⚙️ Step 4. Main Streamlit App
 # -------------------------------------
-st.title("🔗 Power BI Semantic Model – Test Required Fields + Measures")
+st.set_page_config(page_title="AI Sales Insights", layout="wide")
+st.title("🤖 AI Sales Insights Dashboard")
 
-if st.button("Run Data Fetch Test"):
+if st.button("Load Data"):
     with st.spinner("Fetching Power BI data..."):
         try:
             token = get_access_token()
 
-            # 🗓️ dim_date
+            # 🗓️ Date table
             dax_date = """
             EVALUATE
             SELECTCOLUMNS(
@@ -69,12 +71,9 @@ if st.button("Run Data Fetch Test"):
                 "Year", dim_date[Year]
             )
             """
-            date_result = run_dax_query(token, dax_date)
-            dim_date_df = dax_to_df(date_result)
-            st.success(f"✅ dim_date loaded ({len(dim_date_df)} rows)")
-            st.dataframe(dim_date_df.head())
+            dim_date_df = dax_to_df(run_dax_query(token, dax_date))
 
-            # 🌍 fact_opportunity (Region only)
+            # 🌍 Region from fact_opportunity
             dax_fact = """
             EVALUATE
             SELECTCOLUMNS(
@@ -82,12 +81,9 @@ if st.button("Run Data Fetch Test"):
                 "Region", fact_opportunity[RegionSelector]
             )
             """
-            fact_result = run_dax_query(token, dax_fact)
-            fact_df = dax_to_df(fact_result)
-            st.success(f"✅ fact_opportunity loaded ({len(fact_df)} rows)")
-            st.dataframe(fact_df.head())
+            fact_df = dax_to_df(run_dax_query(token, dax_fact))
 
-            # 🧮 *Measures (includes all KPIs)
+            # 🧮 Measures
             dax_measures = """
             EVALUATE
             ROW(
@@ -102,10 +98,97 @@ if st.button("Run Data Fetch Test"):
                 "AI Invocations", [AI Invocations]
             )
             """
-            measures_result = run_dax_query(token, dax_measures)
-            measures_df = dax_to_df(measures_result)
-            st.success("✅ *Measures loaded successfully")
-            st.dataframe(measures_df)
+            measures_df = dax_to_df(run_dax_query(token, dax_measures))
+
+            # 🧍 AI Users & Invocations Cards
+            col1, col2 = st.columns(2)
+            col1.metric("🧠 AI Users", f"{measures_df['AI Users'][0]:,.0f}")
+            col2.metric("⚙️ AI Invocations", f"{measures_df['AI Invocations'][0]:,.0f}")
+
+            # 📈 Sales Trend (Revenue over MonthYear)
+            dax_trend = """
+            EVALUATE
+            SUMMARIZECOLUMNS(
+                dim_date[MonthYear],
+                "Revenue", [Revenue]
+            )
+            """
+            sales_trend_df = dax_to_df(run_dax_query(token, dax_trend))
+            st.subheader("📈 Sales Trend Over Time")
+            st.plotly_chart(
+                px.line(
+                    sales_trend_df,
+                    x="MonthYear",
+                    y="Revenue",
+                    title="Revenue Trend by Month",
+                    markers=True
+                ),
+                use_container_width=True
+            )
+
+            # 💰 Win Rate by Region
+            dax_region = """
+            EVALUATE
+            SUMMARIZECOLUMNS(
+                fact_opportunity[RegionSelector],
+                "Win Rate", [Win Rate]
+            )
+            """
+            region_df = dax_to_df(run_dax_query(token, dax_region))
+            st.subheader("💰 Win Rate by Region")
+            st.plotly_chart(
+                px.bar(
+                    region_df,
+                    x="RegionSelector",
+                    y="Win Rate",
+                    color="RegionSelector",
+                    title="Win Rate by Region"
+                ),
+                use_container_width=True
+            )
+
+            # 🧠 AI Influence vs. Total Deals (Scatter)
+            dax_ai = """
+            EVALUATE
+            ROW(
+                "AI Influenced Win Rate", [AI Influenced Win Rate],
+                "Total Opportunities", [Total Opportunities]
+            )
+            """
+            ai_df = dax_to_df(run_dax_query(token, dax_ai))
+            st.subheader("🧠 AI Influence vs Total Deals")
+            st.plotly_chart(
+                px.scatter(
+                    ai_df,
+                    x="Total Opportunities",
+                    y="AI Influenced Win Rate",
+                    size="Total Opportunities",
+                    color="AI Influenced Win Rate",
+                    title="AI Influence vs Total Deals"
+                ),
+                use_container_width=True
+            )
+
+            # ⏱️ Average Sales Cycle Trend
+            dax_cycle = """
+            EVALUATE
+            SUMMARIZECOLUMNS(
+                dim_date[MonthYear],
+                "Average Sales Cycle (Won)", [Average Sales Cycle (Won)]
+            )
+            """
+            cycle_df = dax_to_df(run_dax_query(token, dax_cycle))
+            st.subheader("⏱️ Average Sales Cycle Trend")
+            st.plotly_chart(
+                px.line(
+                    cycle_df,
+                    x="MonthYear",
+                    y="Average Sales Cycle (Won)",
+                    markers=True,
+                    title="Average Sales Cycle (Won) Over Time"
+                ),
+                use_container_width=True
+            )
 
         except Exception as e:
             st.error(f"❌ Failed to fetch data: {e}")
