@@ -50,7 +50,7 @@ def get_access_token():
 # ----------------------------
 def run_dax_query(query: str):
     token = get_access_token()
-    url = f"https://api.powerbi.com/v1.0/myorg/groups/{WORKSPACE_ID}/datasets/{DATASET_ID}"
+    url = f"https://api.fabric.microsoft.com/v1.0/myorg/groups/{WORKSPACE_ID}/datasets/{DATASET_ID}"
     headers = {
         "Authorization": f"Bearer {token}",
         "Content-Type": "application/json"
