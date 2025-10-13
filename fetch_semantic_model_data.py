@@ -2,8 +2,10 @@ import streamlit as st
 import requests
 import pandas as pd
 
+st.title("📊 Power BI Dataset Data Fetcher")
+
 # ----------------------------
-# 🔐 Secrets (set in Streamlit Cloud)
+# 🔐 Secrets (Streamlit Cloud)
 # ----------------------------
 TENANT_ID = st.secrets["FABRIC_TENANT_ID"]
 CLIENT_ID = st.secrets["FABRIC_CLIENT_ID"]
@@ -14,7 +16,7 @@ RESOURCE = "https://analysis.windows.net/powerbi/api"
 WORKSPACE_ID = "9755694b-649e-4a01-8386-eee2bd91079e"
 DATASET_ID = "5b64ca41-91bd-4db4-b005-0c0327887b5e"
 
-# Tables you want to include
+# Tables to include
 INCLUDE_TABLES = [
     "fact_opportunity",
     "fact_chatlogs",
@@ -28,56 +30,75 @@ INCLUDE_TABLES = [
 ]
 
 # ----------------------------
-# 🔑 Get Access Token
+# 🪙 Get Access Token
 # ----------------------------
-token_url = f"https://login.microsoftonline.com/{TENANT_ID}/oauth2/token"
-token_data = {
-    "grant_type": "client_credentials",
-    "client_id": CLIENT_ID,
-    "client_secret": CLIENT_SECRET,
-    "resource": RESOURCE,
-}
-
-st.title("📊 Fabric Semantic Model Metadata Explorer")
-
-st.write("Getting access token...")
-token_resp = requests.post(token_url, data=token_data)
-
-if token_resp.status_code != 200:
-    st.error(f"Failed to get token: {token_resp.text}")
-    st.stop()
-
-access_token = token_resp.json()["access_token"]
-headers = {"Authorization": f"Bearer {access_token}"}
-st.success("✅ Token acquired successfully!")
+@st.cache_data(ttl=3500)
+def get_access_token():
+    url = f"https://login.microsoftonline.com/{TENANT_ID}/oauth2/v2.0/token"
+    payload = {
+        "grant_type": "client_credentials",
+        "client_id": CLIENT_ID,
+        "client_secret": CLIENT_SECRET,
+        "scope": f"{RESOURCE}/.default"
+    }
+    res = requests.post(url, data=payload)
+    res.raise_for_status()
+    return res.json()["access_token"]
 
 # ----------------------------
-# 🧩 Get Dataset Metadata
+# 📥 Run DAX Query
 # ----------------------------
-meta_url = f"https://api.powerbi.com/v1.0/myorg/groups/{WORKSPACE_ID}/datasets/{DATASET_ID}/tables"
-st.write("Fetching dataset metadata...")
+def run_dax_query(query: str):
+    token = get_access_token()
+    url = f"https://api.powerbi.com/v1.0/myorg/groups/{WORKSPACE_ID}/datasets/{DATASET_ID}/executeQueries"
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Content-Type": "application/json"
+    }
+    body = {"queries": [{"query": query}]}
+    res = requests.post(url, headers=headers, json=body)
+    res.raise_for_status()
+    result = res.json()
 
-meta_resp = requests.get(meta_url, headers=headers)
-if meta_resp.status_code != 200:
-    st.error(f"Failed to get metadata: {meta_resp.text}")
-    st.stop()
-
-meta_data = meta_resp.json().get("value", [])
+    # Handle empty or unexpected results
+    try:
+        rows = result["results"][0]["tables"][0]["rows"]
+        return pd.DataFrame(rows)
+    except (KeyError, IndexError):
+        st.warning("⚠️ No data returned or invalid query format.")
+        return pd.DataFrame()
 
 # ----------------------------
-# 🧮 Filter Tables
+# 🚀 UI
 # ----------------------------
-filtered_tables = [t for t in meta_data if t["name"] in INCLUDE_TABLES]
+st.sidebar.header("Settings")
+selected_tables = st.sidebar.multiselect(
+    "Select tables to fetch",
+    INCLUDE_TABLES,
+    default=INCLUDE_TABLES
+)
 
-if not filtered_tables:
-    st.warning("No matching tables found in dataset.")
-else:
-    st.success(f"✅ Found {len(filtered_tables)} matching tables.")
-    for table in filtered_tables:
-        st.subheader(f"📘 {table['name']}")
-        if "columns" in table:
-            cols = [col["name"] for col in table["columns"]]
-            st.write("**Columns:**")
-            st.dataframe(pd.DataFrame(cols, columns=["Column Name"]))
-        else:
-            st.info("No columns available for this table.")
+if st.button("Fetch Selected Tables"):
+    token = get_access_token()
+    st.success("✅ Connected successfully to Power BI.")
+    
+    for table in selected_tables:
+        with st.expander(f"📄 {table}", expanded=False):
+            query = f"EVALUATE {table}" if table != "*Measures" else "EVALUATE SUMMARIZECOLUMNS('Measures'[Name], 'Measures'[Value])"
+            try:
+                df = run_dax_query(query)
+                if not df.empty:
+                    st.dataframe(df, use_container_width=True)
+                    csv = df.to_csv(index=False).encode("utf-8")
+                    st.download_button(
+                        label=f"⬇️ Download {table}.csv",
+                        data=csv,
+                        file_name=f"{table}.csv",
+                        mime="text/csv"
+                    )
+                else:
+                    st.info(f"No data found in {table}.")
+            except Exception as e:
+                st.error(f"❌ Failed to fetch {table}: {str(e)}")
+
+st.caption("🔒 Requires Build permission on the Power BI dataset and Dataset.Read.All API permission in Azure AD.")
