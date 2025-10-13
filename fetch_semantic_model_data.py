@@ -73,29 +73,6 @@ def fetch_table(table_name, access_token):
 # -------------------------------------
 st.title("🔗 Power BI Semantic Model Data Loader")
 
-if st.button("Load All Tables"):
-    with st.spinner("Fetching Power BI data..."):
-        token = get_access_token()
-        all_data = {}
-
-        for t in TABLES:
-            df = fetch_table(t, token)
-            if df is not None:
-                all_data[t] = df
-
-        # 🧮 Fetch measures (optional)
-        try:
-            dax_query = "EVALUATE ROW('Total Revenue', [Total Revenue], 'Total Chat Count', [Total Chats])"
-            result = run_dax_query(token, dax_query)
-            rows = result["results"][0]["tables"][0]["rows"]
-            measures_df = pd.DataFrame(rows)
-            all_data["*Measures"] = measures_df
-            st.success("✅ Loaded measures table")
-        except Exception as e:
-            st.warning(f"⚠️ Measures query skipped or not found: {e}")
-
-        st.write("### ✅ Loaded Tables:")
-        st.json(list(all_data.keys()))
         
 # -------------------------------------
 # 🧮 Step 5. Fetch Measures
@@ -122,7 +99,7 @@ def fetch_measures(access_token):
 # -------------------------------------
 # 🧠 Example usage inside your button
 # -------------------------------------
-if st.button("Load All Tables"):
+if st.button("Load All Tables",key="load_measures_btn"):
     with st.spinner("Fetching Power BI data..."):
         token = get_access_token()
         all_data = {}
