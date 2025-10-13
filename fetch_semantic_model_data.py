@@ -50,18 +50,43 @@ def dax_to_df(result_json):
     return pd.DataFrame(rows)
 
 # -------------------------------------
-# ⚙️ Step 4. Streamlit App
+# ⚙️ Step 4. Main Streamlit App
 # -------------------------------------
-st.set_page_config(page_title="AI KPI Dashboard", layout="wide")
-st.title("📊 AI KPI Dashboard")
+st.title("🔗 Power BI Semantic Model – Auto Load Test")
 
 with st.spinner("Fetching Power BI data automatically..."):
     try:
         token = get_access_token()
 
-        # ----------------------------
-        # 🧮 Load Measures
-        # ----------------------------
+        # 🗓️ dim_date
+        dax_date = """
+        EVALUATE
+        SELECTCOLUMNS(
+            dim_date,
+            "MonthYear", dim_date[MonthYear],
+            "MonthYear_Sort", dim_date[MonthYear_Sort],
+            "Year", dim_date[Year]
+        )
+        """
+        date_result = run_dax_query(token, dax_date)
+        dim_date_df = dax_to_df(date_result)
+        st.success(f"✅ dim_date loaded ({len(dim_date_df)} rows)")
+        st.dataframe(dim_date_df.head())
+
+        # 🌍 fact_opportunity (Region only)
+        dax_fact = """
+        EVALUATE
+        SELECTCOLUMNS(
+            fact_opportunity,
+            "Region", fact_opportunity[RegionSelector]
+        )
+        """
+        fact_result = run_dax_query(token, dax_fact)
+        fact_df = dax_to_df(fact_result)
+        st.success(f"✅ fact_opportunity loaded ({len(fact_df)} rows)")
+        st.dataframe(fact_df.head())
+
+        # 🧮 *Measures (includes all KPIs)
         dax_measures = """
         EVALUATE
         ROW(
@@ -70,7 +95,6 @@ with st.spinner("Fetching Power BI data automatically..."):
             "Average Sales Cycle (Won)", [Average Sales Cycle (Won)],
             "AI Influenced Win Rate", [AI Influenced Win Rate],
             "Total Opportunities", [Total Opportunities],
-            "Win More", [Win More (Total Opportunities)],
             "Won Opportunities", [Won Opps #],
             "Average Deal Size", [Average Deal Size],
             "AI Users", [AI Users],
@@ -79,82 +103,8 @@ with st.spinner("Fetching Power BI data automatically..."):
         """
         measures_result = run_dax_query(token, dax_measures)
         measures_df = dax_to_df(measures_result)
-
         st.success("✅ *Measures loaded successfully")
         st.dataframe(measures_df)
-
-        # ----------------------------
-        # 🔹 Top KPI Metrics
-        # ----------------------------
-        win_more = measures_df["Win More"].iloc[0] + 10 
-        win_rate = measures_df["Win Rate"].iloc[0]
-        avg_cycle = measures_df["Average Sales Cycle (Won)"].iloc[0]
-        avg_deal_size = measures_df["Average Deal Size"].iloc[0]
-        ai_win_rate = measures_df["AI Influenced Win Rate"].iloc[0]
-
-        col1, col2, col3, col4, col5 = st.columns(5)
-        col1.metric("Win More", f"{win_more:.1f}%")
-        col2.metric("Win Rate", f"{win_rate:.1f}%")
-        col3.metric("Avg Sales Cycle", f"{avg_cycle} days")
-        col4.metric("Avg Deal Size", f"${avg_deal_size:,.0f}")
-        col5.metric("AI Influenced Win Rate", f"{ai_win_rate:.1f}%")
-
-        st.markdown("---")
-
-        # ----------------------------
-        # 📌 Core AI & Sales Metrics (Color-Coded)
-        # ----------------------------
-        st.subheader("📌 Core AI & Sales Metrics")
-
-        # CSS styling for metric cards
-        st.markdown("""
-            <style>
-                .metric-card {
-                    background-color: #f8f9fa;
-                    padding: 20px;
-                    border-radius: 15px;
-                    box-shadow: 0 2px 6px rgba(0,0,0,0.1);
-                    text-align: center;
-                    transition: transform 0.2s ease;
-                }
-                .metric-card:hover { transform: scale(1.02); }
-                .metric-label { font-size: 16px; color: #555; margin-bottom: 5px; }
-                .metric-value { font-size: 28px; font-weight: 600; }
-            </style>
-        """, unsafe_allow_html=True)
-
-        # Pull KPI values
-        ai_usage = measures_df["AI Users"].iloc[0]
-        sales = measures_df["Revenue"].iloc[0]
-        growth = measures_df["AI Influenced Win Rate"].iloc[0]  # example, adjust if needed
-
-        # Dynamic colors
-        growth_color = "green" if growth >= 0 else "red"
-        ai_color = "green" if ai_usage >= 50 else "orange"
-        sales_color = "#0078D7"
-
-        col1, col2, col3 = st.columns(3)
-
-        with col1:
-            st.markdown(
-                f"<div class='metric-card'><div class='metric-label'>Current AI Usage %</div>"
-                f"<div class='metric-value' style='color:{ai_color};'>{ai_usage:.1f}%</div></div>",
-                unsafe_allow_html=True
-            )
-
-        with col2:
-            st.markdown(
-                f"<div class='metric-card'><div class='metric-label'>Latest Monthly Sales</div>"
-                f"<div class='metric-value' style='color:{sales_color};'>${sales:,.0f}</div></div>",
-                unsafe_allow_html=True
-            )
-
-        with col3:
-            st.markdown(
-                f"<div class='metric-card'><div class='metric-label'>Sales Growth (MoM)</div>"
-                f"<div class='metric-value' style='color:{growth_color};'>{growth:.2f}%</div></div>",
-                unsafe_allow_html=True
-            )
 
     except Exception as e:
         st.error(f"❌ Failed to fetch data: {e}")
