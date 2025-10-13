@@ -4,7 +4,7 @@ import pandas as pd
 import json
 from time import sleep
 
-st.title("📊 Power BI Semantic Model Data Loader")
+st.title("📊 Power BI Semantic Model Data Loader (with Measures)")
 
 # ----------------------------
 # 🔐 Secrets (set in Streamlit)
@@ -27,8 +27,7 @@ TABLES = [
     "chatfeedback",
     "Dim_ProductHierarchy",
     "Dim_c4c_accounts",
-    "Dim_Emp_Hierarchy_SCD2",
-    "*Measures"
+    "Dim_Emp_Hierarchy_SCD2"
 ]
 
 # ----------------------------
@@ -55,36 +54,46 @@ except Exception as e:
     st.stop()
 
 # ----------------------------
-# 2️⃣ Query function for one table
+# 2️⃣ Query function for a table
 # ----------------------------
 def fetch_table(table_name, limit=100):
     url = f"https://api.powerbi.com/v1.0/myorg/groups/{WORKSPACE_ID}/datasets/{DATASET_ID}/executeQueries"
-    headers = {
-        "Authorization": f"Bearer {token}",
-        "Content-Type": "application/json"
-    }
-
-    # DAX query
-    query = {
-        "queries": [{"query": f"EVALUATE TOPN({limit}, '{table_name}')"}]
-    }
-
+    headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
+    query = {"queries": [{"query": f"EVALUATE TOPN({limit}, '{table_name}')"}]}
     res = requests.post(url, headers=headers, json=query)
     if res.status_code != 200:
         raise Exception(f"{res.status_code} - {res.text}")
-
     result = res.json()
     if not result.get("results"):
         return pd.DataFrame()
-
     table = result["results"][0]["tables"][0]
     return pd.DataFrame(table["rows"])
 
 # ----------------------------
-# 3️⃣ Fetch all tables
+# 3️⃣ Fetch Measures metadata
 # ----------------------------
-if st.button("📥 Load All Tables"):
-    st.info("Fetching data from semantic model… this may take a few seconds ⏳")
+def fetch_measures():
+    url = f"https://api.powerbi.com/v1.0/myorg/groups/{WORKSPACE_ID}/datasets/{DATASET_ID}/tables"
+    headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
+    res = requests.get(url, headers=headers)
+    res.raise_for_status()
+    tables = res.json().get("value", [])
+    measures = []
+    for tbl in tables:
+        if "measures" in tbl:
+            for m in tbl["measures"]:
+                measures.append({
+                    "table": tbl["name"],
+                    "measureName": m["name"],
+                    "expression": m["expression"]
+                })
+    return pd.DataFrame(measures)
+
+# ----------------------------
+# 4️⃣ Run fetch
+# ----------------------------
+if st.button("📥 Load All Tables & Measures"):
+    st.info("Fetching data from semantic model… please wait ⏳")
 
     dfs = {}
     for t in TABLES:
@@ -96,7 +105,17 @@ if st.button("📥 Load All Tables"):
                 st.dataframe(df.head(10))
             except Exception as e:
                 st.error(f"❌ Failed to fetch {t}: {e}")
-            sleep(1)  # slight pause to avoid hitting API too fast
+            sleep(1)
 
-    st.success("🎉 All tables fetched!")
-    st.write("Available dataframes:", list(dfs.keys()))
+    # Fetch measures
+    with st.spinner("Fetching *Measures..."):
+        try:
+            measures_df = fetch_measures()
+            dfs["*Measures"] = measures_df
+            st.success(f"✅ Retrieved {len(measures_df)} measures")
+            st.dataframe(measures_df)
+        except Exception as e:
+            st.error(f"❌ Failed to fetch measures: {e}")
+
+    st.success("🎉 All tables & measures loaded!")
+    st.write("✅ Available DataFrames:", list(dfs.keys()))
