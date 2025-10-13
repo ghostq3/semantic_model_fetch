@@ -70,7 +70,7 @@ with st.spinner("Fetching Power BI data automatically..."):
             "Average Sales Cycle (Won)", [Average Sales Cycle (Won)],
             "AI Influenced Win Rate", [AI Influenced Win Rate],
             "Total Opportunities", [Total Opportunities],
-            "Win More", Win More (Total Opportunities),
+            "Win More", [Win More (Total Opportunities)],
             "Won Opportunities", [Won Opps #],
             "Average Deal Size", [Average Deal Size],
             "AI Users", [AI Users],
