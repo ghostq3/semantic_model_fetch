@@ -1,119 +1,64 @@
 import streamlit as st
 import requests
-import pandas as pd
 
-# ----------------------------
-# 🔒 Load Fabric Credentials from Secrets
-# ----------------------------
+st.title("🔍 Power BI Service Principal Access Tester")
+
+# --- Load secrets ---
 TENANT_ID = st.secrets["FABRIC_TENANT_ID"]
 CLIENT_ID = st.secrets["FABRIC_CLIENT_ID"]
 CLIENT_SECRET = st.secrets["FABRIC_CLIENT_SECRET"]
 RESOURCE = st.secrets["FABRIC_RESOURCE"]
-WORKSPACE_ID = st.secrets["FABRIC_WORKSPACE_ID"]
-SEMANTIC_MODEL_ID = st.secrets["FABRIC_SEMANTIC_MODEL_ID"]
 
-# ----------------------------
-# ⚙️ Configuration: Tables to Include
-# ----------------------------
-TARGET_TABLES = [
-    "fact_opportunity",
-    "fact_chatlogs",
-    "dim_date",
-    "chat_analysis",
-    "chatfeedback",
-    "Dim_ProductHierarchy",
-    "Dim_c4c_accounts",
-    "Dim_Emp_Hierarchy_SCD2",
-    "*Measures"
-]
+# --- Token request ---
+st.write("Requesting access token...")
 
-# ----------------------------
-# 🧾 Get Access Token
-# ----------------------------
-@st.cache_data(ttl=3300)
-def get_fabric_token():
-    url = f"https://login.microsoftonline.com/{TENANT_ID}/oauth2/token"
-    data = {
-        "grant_type": "client_credentials",
-        "client_id": CLIENT_ID,
-        "client_secret": CLIENT_SECRET,
-        "resource": RESOURCE,
-    }
-    resp = requests.post(url, data=data)
-    if resp.status_code != 200:
-        st.error(f"Token request failed: {resp.text}")
-        st.stop()
-    return resp.json()["access_token"]
+token_url = f"https://login.microsoftonline.com/{TENANT_ID}/oauth2/token"
+token_data = {
+    "grant_type": "client_credentials",
+    "client_id": CLIENT_ID,
+    "client_secret": CLIENT_SECRET,
+    "resource": RESOURCE,
+}
 
-# ----------------------------
-# 📦 Get Semantic Model Metadata
-# ----------------------------
-def get_semantic_model_metadata(workspace_id, model_id, token):
-    api_url = f"https://api.fabric.microsoft.com/v1/workspaces/{workspace_id}/semanticModels/{model_id}/tables"
-    headers = {"Authorization": f"Bearer {token}"}
-    resp = requests.get(api_url, headers=headers)
-    if resp.status_code != 200:
-        st.error(f"Metadata fetch failed: {resp.text}")
-        st.stop()
-    return resp.json()
+token_resp = requests.post(token_url, data=token_data)
+if token_resp.status_code != 200:
+    st.error(f"Failed to get token: {token_resp.text}")
+    st.stop()
 
-# ----------------------------
-# 🧮 Extract Columns and Measures (Filtered)
-# ----------------------------
-def extract_filtered_metadata(metadata_json, allowed_tables):
-    tables = metadata_json.get("value", [])
-    data = []
-    for table in tables:
-        table_name = table.get("name")
-        if table_name not in allowed_tables:
-            continue  # skip any tables not in the list
-        for col in table.get("columns", []):
-            data.append({
-                "Table": table_name,
-                "Name": col.get("name"),
-                "Type": "Column",
-                "DataType": col.get("dataType")
-            })
-        for measure in table.get("measures", []):
-            data.append({
-                "Table": table_name,
-                "Name": measure.get("name"),
-                "Type": "Measure",
-                "Expression": measure.get("expression")
-            })
-    return pd.DataFrame(data)
+access_token = token_resp.json()["access_token"]
+st.success("✅ Token acquired successfully!")
 
-# ----------------------------
-# 🧭 Streamlit UI
-# ----------------------------
-st.set_page_config(page_title="Fabric Semantic Model Explorer", layout="wide")
-st.title("🔍 Microsoft Fabric Semantic Model Explorer (Filtered)")
-st.write("This app connects securely to your Fabric semantic model and retrieves only selected tables and measures.")
+# --- Headers for Power BI REST API ---
+headers = {"Authorization": f"Bearer {access_token}"}
 
-if st.button("Fetch Selected Tables"):
-    with st.spinner("Authenticating and fetching model metadata..."):
-        token = get_fabric_token()
-        metadata = get_semantic_model_metadata(WORKSPACE_ID, SEMANTIC_MODEL_ID, token)
-        df = extract_filtered_metadata(metadata, TARGET_TABLES)
-        if df.empty:
-            st.warning("No data found for the selected tables. Check your table names or permissions.")
-        else:
-            st.success(f"✅ Retrieved {len(df)} entries successfully.")
-            st.dataframe(df, use_container_width=True)
+# --- Get workspaces ---
+st.write("Fetching accessible workspaces...")
 
-            # Filter dropdowns for easy search
-            st.subheader("🔎 Filter Results")
-            table_choice = st.selectbox("Filter by Table", ["All"] + sorted(df["Table"].unique()))
-            type_choice = st.selectbox("Filter by Type", ["All", "Column", "Measure"])
+groups_url = "https://api.powerbi.com/v1.0/myorg/groups"
+groups_resp = requests.get(groups_url, headers=headers)
 
-            filtered_df = df.copy()
-            if table_choice != "All":
-                filtered_df = filtered_df[filtered_df["Table"] == table_choice]
-            if type_choice != "All":
-                filtered_df = filtered_df[filtered_df["Type"] == type_choice]
+if groups_resp.status_code != 200:
+    st.error(f"❌ Failed to get workspaces: {groups_resp.text}")
+    st.stop()
 
-            st.dataframe(filtered_df, use_container_width=True)
+groups_data = groups_resp.json().get("value", [])
 
-            # Download CSV
-            csv = filtered_df.to_csv(index=False).encode("utf-8")
-            st.download_button("📥 Download CSV", csv, "fabric_filtered_metadata.csv", "text/csv")
+if not groups_data:
+    st.warning("⚠️ No workspaces found. Your service principal might not have access to any.")
+else:
+    st.success(f"✅ Found {len(groups_data)} accessible workspace(s).")
+    for g in groups_data:
+        st.write(f"- **{g['name']}** (ID: {g['id']})")
+
+    # --- Optionally, list datasets per workspace ---
+    st.subheader("Datasets per Workspace")
+    for g in groups_data:
+        ws_id = g["id"]
+        ds_url = f"https://api.powerbi.com/v1.0/myorg/groups/{ws_id}/datasets"
+        ds_resp = requests.get(ds_url, headers=headers)
+        if ds_resp.status_code == 200:
+            datasets = ds_resp.json().get("value", [])
+            if datasets:
+                st.markdown(f"### 📊 {g['name']}")
+                for ds in datasets:
+                    st.write(f"• {ds['name']} — *(ID: {ds['id']})*")
