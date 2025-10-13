@@ -111,7 +111,7 @@ if st.button("📥 Load All Tables & Measures"):
     with st.spinner("Fetching *Measures..."):
         try:
             measures_df = fetch_measures()
-            dfs["*Measures"] = measures_df
+            dfs["Measures"] = measures_df
             st.success(f"✅ Retrieved {len(measures_df)} measures")
             st.dataframe(measures_df)
         except Exception as e:
