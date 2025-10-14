@@ -130,15 +130,13 @@ col5.metric("AI Influenced Win Rate", f"{ai_influenced_win_rate:.1f}%")
 if not fact_df.empty:
     st.subheader("🌍 Opportunities by Region (Including AI Influenced)")
 
-    # Assume you have total opportunities per region and AI Influenced Win Rate
+    # Summarize total opportunities per region
     region_summary = fact_df.groupby("Region").agg(
-        Total_Opps=("Region", "count"),   # or a column counting opportunities
+        Total_Opps=("Region", "count")  # or replace with actual opportunity count column
     ).reset_index()
 
-    # Add AI-influenced opportunities using the win rate
-    region_summary["AI_Influenced_Opps"] = region_summary["Total_Opps"] * (measures_df.at[0, "AI Influenced Win Rate"])
-
-    # Remaining opportunities
+    # Compute AI-influenced opportunities using the measure
+    region_summary["AI_Influenced_Opps"] = region_summary["Total_Opps"] * measures_df.at[0, "AI Influenced Win Rate"]
     region_summary["Non_AI_Opps"] = region_summary["Total_Opps"] - region_summary["AI_Influenced_Opps"]
 
     # Melt for stacked bar
@@ -159,11 +157,12 @@ if not fact_df.empty:
         barmode="stack",
         labels={"Type": "Opportunity Type"}
     )
-    
+
     # Set custom colors
     fig_region.update_traces(marker_color=["#006771", "#FF9999"])
 
     st.plotly_chart(fig_region)
+
 
 
 
