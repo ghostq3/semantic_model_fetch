@@ -126,32 +126,6 @@ col3.metric("Avg Sales Cycle", f"{avg_sales_cycle:.0f} days")
 col4.metric("Avg Deal Size", f"${avg_deal_size:,.0f}")
 col5.metric("AI Influenced Win Rate", f"{ai_influenced_win_rate:.1f}%")
 
-# Merge measures with dim_date to get MonthYear
-data = pd.concat([dim_date_df["MonthYear"], measures_df[["Revenue", "AI Users"]]], axis=1)
-
-# Optionally, sort by MonthYear_Sort if needed
-# data = data.merge(dim_date_df[["MonthYear", "MonthYear_Sort"]], on="MonthYear")
-# data = data.sort_values("MonthYear_Sort")
-
-# Line chart
-fig = px.line(
-    data,
-    x="MonthYear",
-    y="Revenue",
-    title="AI Usage vs Revenue Over Time",
-    color_discrete_sequence=["#006771"]
-)
-
-# Add AI Users as a secondary line (scaled if needed)
-fig.add_scatter(
-    x=data["MonthYear"],
-    y=data["AI Users"] * 1000,  # scale if values are too small
-    mode="lines",
-    name="AI Users (scaled)",
-    line=dict(color="#999999", dash="dot")
-)
-
-st.plotly_chart(fig, use_container_width=True)
 
 # Bar Chart Per Opp
 if not fact_df.empty:
