@@ -53,7 +53,6 @@ def dax_to_df(result_json):
 # -------------------------------------
 # ⚙️ Step 4. Fetch Data & Measures
 # -------------------------------------
-st.title("🔗 Power BI Semantic Model – Streamlit Visuals")
 
 with st.spinner("Fetching Power BI data automatically..."):
     try:
@@ -101,7 +100,6 @@ with st.spinner("Fetching Power BI data automatically..."):
         """
         measures_df = dax_to_df(run_dax_query(token, dax_measures))
         measures_df.columns = measures_df.columns.str.replace(r"[\[\]]", "", regex=True)
-        st.success("✅ Data & measures loaded successfully")
 
     except Exception as e:
         st.error(f"❌ Failed to fetch data: {e}")
