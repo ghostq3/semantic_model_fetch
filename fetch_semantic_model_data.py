@@ -114,17 +114,17 @@ st.title("📊 AI KPI Dashboard")
 
 # KPIs
 # Extract measures as variables
-win_more = measures_df.at[0, "Win More"]
-win_rate = measures_df.at[0, "Win Rate"]
+win_more = measures_df.at[0, "Win More"] * 100
+win_rate = measures_df.at[0, "Win Rate"] * 100
 avg_sales_cycle = measures_df.at[0, "Average Sales Cycle (Won)"]
 avg_deal_size = measures_df.at[0, "Average Deal Size"]
-ai_influenced_win_rate = measures_df.at[0, "AI Influenced Win Rate"]
+ai_influenced_win_rate = measures_df.at[0, "AI Influenced Win Rate"] * 100
 
 # Display KPIs
 col1, col2, col3, col4, col5 = st.columns(5)
 col1.metric("Win More", f"{win_more:.1f}%")
 col2.metric("Win Rate", f"{win_rate:.1f}%")
-col3.metric("Avg Sales Cycle", f"{avg_sales_cycle} days")
+col3.metric("Avg Sales Cycle", f"{avg_sales_cycle:.0f} days") 
 col4.metric("Avg Deal Size", f"${avg_deal_size:,.0f}")
 col5.metric("AI Influenced Win Rate", f"{ai_influenced_win_rate:.1f}%")
 
