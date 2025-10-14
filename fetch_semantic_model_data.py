@@ -80,8 +80,7 @@ with st.spinner("Fetching Power BI data automatically..."):
         )
         """
         fact_df = dax_to_df(run_dax_query(token, dax_fact))
-        st.write(fact_df.columns)
-        st.write(fact_df.head())
+        fact_df.columns = fact_df.columns.str.replace(r"[\[\]]", "", regex=True)
 
 
         # ----- Measures -----
