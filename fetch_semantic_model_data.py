@@ -122,9 +122,3 @@ if not measures_df.empty:
     for i, col in enumerate(measures_df.columns):
         kpi_cols[i].metric(col, measures_df[col].iloc[0])
 
-# Example 3: Month-Year trend (if you join with measures)
-if not dim_date_df.empty and not measures_df.empty:
-    # For demo: randomly assign revenue per month (replace with actual measure if you have time series)
-    dim_date_df["Revenue"] = pd.np.random.randint(1000, 5000, len(dim_date_df))
-    fig_trend = px.line(dim_date_df, x="MonthYear", y="Revenue", title="Revenue Trend by Month")
-    st.plotly_chart(fig_trend)
