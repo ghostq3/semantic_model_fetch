@@ -159,6 +159,9 @@ if not fact_df.empty:
         barmode="stack",
         labels={"Type": "Opportunity Type"}
     )
+    
+    # Set custom colors
+    fig_region.update_traces(marker_color=["#006771", "#FF9999"])
 
     st.plotly_chart(fig_region)
 
