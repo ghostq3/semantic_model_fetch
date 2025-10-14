@@ -54,11 +54,14 @@ def dax_to_df(result_json):
 # ⚙️ Step 4. Fetch Data & Measures
 # -------------------------------------
 
+# ---------------------------
+# Fetch Data & Measures
+# ---------------------------
 with st.spinner("Fetching Power BI data automatically..."):
     try:
         token = get_access_token()
 
-        # ----- dim_date -----
+        # dim_date
         dax_date = """
         EVALUATE
         SELECTCOLUMNS(
@@ -70,19 +73,20 @@ with st.spinner("Fetching Power BI data automatically..."):
         """
         dim_date_df = dax_to_df(run_dax_query(token, dax_date))
         dim_date_df.columns = dim_date_df.columns.str.replace(r"[\[\]]", "", regex=True)
-        # ----- fact_opportunity -----
+
+        # fact_opportunity
         dax_fact = """
         EVALUATE
         SELECTCOLUMNS(
             fact_opportunity,
-            "Region", fact_opportunity[RegionSelector]
+            "Region", fact_opportunity[RegionSelector],
+            "MonthYear", fact_opportunity[MonthYear]   -- ensure MonthYear is included
         )
         """
         fact_df = dax_to_df(run_dax_query(token, dax_fact))
         fact_df.columns = fact_df.columns.str.replace(r"[\[\]]", "", regex=True)
 
-
-        # ----- Measures -----
+        # Measures
         dax_measures = """
         EVALUATE
         ROW(
@@ -101,41 +105,68 @@ with st.spinner("Fetching Power BI data automatically..."):
         measures_df = dax_to_df(run_dax_query(token, dax_measures))
         measures_df.columns = measures_df.columns.str.replace(r"[\[\]]", "", regex=True)
 
+        st.success("✅ Data & measures loaded successfully")
+
     except Exception as e:
         st.error(f"❌ Failed to fetch data: {e}")
 
-# ----------------------------
-# Streamlit App
-# ----------------------------
+# ---------------------------
+# App Layout
+# ---------------------------
 st.set_page_config(page_title="AI KPI Dashboard", layout="wide")
 st.title("📊 AI KPI Dashboard")
 
+# ---------------------------
+# Global Date Filter
+# ---------------------------
+if not dim_date_df.empty:
+    dim_date_df["MonthYear_dt"] = pd.to_datetime(dim_date_df["MonthYear"], format="%Y-%m")
+
+    start_date, end_date = st.date_input(
+        "📅 Select date range",
+        value=[dim_date_df["MonthYear_dt"].min(), dim_date_df["MonthYear_dt"].max()],
+        min_value=dim_date_df["MonthYear_dt"].min(),
+        max_value=dim_date_df["MonthYear_dt"].max()
+    )
+
+    # Filter fact_df
+    fact_df_filtered = fact_df.merge(dim_date_df, how="left", on="MonthYear")
+    fact_df_filtered = fact_df_filtered[
+        (fact_df_filtered["MonthYear_dt"] >= pd.to_datetime(start_date)) &
+        (fact_df_filtered["MonthYear_dt"] <= pd.to_datetime(end_date))
+    ]
+else:
+    fact_df_filtered = fact_df.copy()
+
+# ---------------------------
 # KPIs
-# Extract measures as variables
-win_more = measures_df.at[0, "Win More"] * 100
-win_rate = measures_df.at[0, "Win Rate"] * 100
-avg_sales_cycle = measures_df.at[0, "Average Sales Cycle (Won)"]
-avg_deal_size = measures_df.at[0, "Average Deal Size"]
-ai_influenced_win_rate = measures_df.at[0, "AI Influenced Win Rate"] * 100
+# ---------------------------
+if not measures_df.empty:
+    win_more = measures_df.at[0, "Win More"] * 100
+    win_rate = measures_df.at[0, "Win Rate"] * 100
+    avg_sales_cycle = measures_df.at[0, "Average Sales Cycle (Won)"]
+    avg_deal_size = measures_df.at[0, "Average Deal Size"]
+    ai_influenced_win_rate = measures_df.at[0, "AI Influenced Win Rate"] * 100
 
-# Display KPIs
-col1, col2, col3, col4, col5 = st.columns(5)
-col1.metric("Win More", f"{win_more:.1f}%")
-col2.metric("Win Rate", f"{win_rate:.1f}%")
-col3.metric("Avg Sales Cycle", f"{avg_sales_cycle:.0f} days") 
-col4.metric("Avg Deal Size", f"${avg_deal_size:,.0f}")
-col5.metric("AI Influenced Win Rate", f"{ai_influenced_win_rate:.1f}%")
+    col1, col2, col3, col4, col5 = st.columns(5)
+    col1.metric("Win More", f"{win_more:.1f}%")
+    col2.metric("Win Rate", f"{win_rate:.1f}%")
+    col3.metric("Avg Sales Cycle", f"{avg_sales_cycle:.0f} days")
+    col4.metric("Avg Deal Size", f"${avg_deal_size:,.0f}")
+    col5.metric("AI Influenced Win Rate", f"{ai_influenced_win_rate:.1f}%")
 
-# Bar Chart Per Opp
-if not fact_df.empty:
-    st.subheader("🌍 Opportunities by Region (Including AI Influenced)")
+# ---------------------------
+# Opportunities by Region Stacked Bar
+# ---------------------------
+if not fact_df_filtered.empty:
+    st.subheader("🌍 Opportunities by Region (AI Influenced vs Others)")
 
     # Summarize total opportunities per region
-    region_summary = fact_df.groupby("Region").agg(
-        Total_Opps=("Region", "count")  # replace with actual opportunity count column if needed
+    region_summary = fact_df_filtered.groupby("Region").agg(
+        Total_Opps=("Region", "count")
     ).reset_index()
 
-    # Compute AI-influenced opportunities using the measure
+    # Compute AI-influenced opportunities
     region_summary["AI_Influenced_Opps"] = region_summary["Total_Opps"] * measures_df.at[0, "AI Influenced Win Rate"]
     region_summary["Non_AI_Opps"] = region_summary["Total_Opps"] - region_summary["AI_Influenced_Opps"]
 
@@ -153,14 +184,17 @@ if not fact_df.empty:
         x="Region",
         y="Opportunities",
         color="Type",
-        title="Opportunities per Region (AI Influenced vs Others)",
         barmode="stack",
         labels={"Type": "Opportunity Type"},
         color_discrete_map={
             "Non_AI_Opps": "#006771",
             "AI_Influenced_Opps": "#FF9999"
-        }
+        },
+        title="Opportunities per Region"
     )
+
+    # Optional: Improve legend names
+    fig_region.for_each_trace(lambda t: t.update(name="AI Influenced" if t.name=="AI_Influenced_Opps" else "Other Opportunities"))
 
     st.plotly_chart(fig_region)
 
