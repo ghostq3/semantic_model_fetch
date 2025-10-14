@@ -1,9 +1,10 @@
 import streamlit as st
 import requests
 import pandas as pd
+import plotly.express as px
 
 # ----------------------------
-# 🔐 Secrets (from Streamlit)
+# 🔐 Secrets
 # ----------------------------
 TENANT_ID = st.secrets["FABRIC_TENANT_ID"]
 CLIENT_ID = st.secrets["FABRIC_CLIENT_ID"]
@@ -50,15 +51,15 @@ def dax_to_df(result_json):
     return pd.DataFrame(rows)
 
 # -------------------------------------
-# ⚙️ Step 4. Main Streamlit App
+# ⚙️ Step 4. Fetch Data & Measures
 # -------------------------------------
-st.title("🔗 Power BI Semantic Model – Auto Load Test")
+st.title("🔗 Power BI Semantic Model – Streamlit Visuals")
 
 with st.spinner("Fetching Power BI data automatically..."):
     try:
         token = get_access_token()
 
-        # 🗓️ dim_date
+        # ----- dim_date -----
         dax_date = """
         EVALUATE
         SELECTCOLUMNS(
@@ -68,12 +69,9 @@ with st.spinner("Fetching Power BI data automatically..."):
             "Year", dim_date[Year]
         )
         """
-        date_result = run_dax_query(token, dax_date)
-        dim_date_df = dax_to_df(date_result)
-        st.success(f"✅ dim_date loaded ({len(dim_date_df)} rows)")
-        st.dataframe(dim_date_df.head())
+        dim_date_df = dax_to_df(run_dax_query(token, dax_date))
 
-        # 🌍 fact_opportunity (Region only)
+        # ----- fact_opportunity -----
         dax_fact = """
         EVALUATE
         SELECTCOLUMNS(
@@ -81,12 +79,9 @@ with st.spinner("Fetching Power BI data automatically..."):
             "Region", fact_opportunity[RegionSelector]
         )
         """
-        fact_result = run_dax_query(token, dax_fact)
-        fact_df = dax_to_df(fact_result)
-        st.success(f"✅ fact_opportunity loaded ({len(fact_df)} rows)")
-        st.dataframe(fact_df.head())
+        fact_df = dax_to_df(run_dax_query(token, dax_fact))
 
-        # 🧮 *Measures (includes all KPIs)
+        # ----- Measures -----
         dax_measures = """
         EVALUATE
         ROW(
@@ -101,10 +96,33 @@ with st.spinner("Fetching Power BI data automatically..."):
             "AI Invocations", [AI Invocations]
         )
         """
-        measures_result = run_dax_query(token, dax_measures)
-        measures_df = dax_to_df(measures_result)
-        st.success("✅ *Measures loaded successfully")
-        st.dataframe(measures_df)
+        measures_df = dax_to_df(run_dax_query(token, dax_measures))
+
+        st.success("✅ Data & measures loaded successfully")
 
     except Exception as e:
         st.error(f"❌ Failed to fetch data: {e}")
+
+# -------------------------------------
+# 🔹 Step 5. Example Visuals
+# -------------------------------------
+
+# Example 1: Bar chart of opportunities by region
+if not fact_df.empty:
+    st.subheader("🌍 Opportunities by Region")
+    fig_region = px.histogram(fact_df, x="Region", title="Opportunities per Region")
+    st.plotly_chart(fig_region)
+
+# Example 2: KPIs as metrics
+if not measures_df.empty:
+    st.subheader("📊 KPIs")
+    kpi_cols = st.columns(len(measures_df.columns))
+    for i, col in enumerate(measures_df.columns):
+        kpi_cols[i].metric(col, measures_df[col].iloc[0])
+
+# Example 3: Month-Year trend (if you join with measures)
+if not dim_date_df.empty and not measures_df.empty:
+    # For demo: randomly assign revenue per month (replace with actual measure if you have time series)
+    dim_date_df["Revenue"] = pd.np.random.randint(1000, 5000, len(dim_date_df))
+    fig_trend = px.line(dim_date_df, x="MonthYear", y="Revenue", title="Revenue Trend by Month")
+    st.plotly_chart(fig_trend)
