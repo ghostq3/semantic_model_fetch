@@ -132,7 +132,7 @@ if not fact_df.empty:
 
     # Summarize total opportunities per region
     region_summary = fact_df.groupby("Region").agg(
-        Total_Opps=("Region", "count")  # or replace with actual opportunity count column
+        Total_Opps=("Region", "count")  # replace with actual opportunity count column if needed
     ).reset_index()
 
     # Compute AI-influenced opportunities using the measure
@@ -147,7 +147,7 @@ if not fact_df.empty:
         value_name="Opportunities"
     )
 
-    # Plot
+    # Plot with custom colors
     fig_region = px.bar(
         plot_df,
         x="Region",
@@ -155,13 +155,15 @@ if not fact_df.empty:
         color="Type",
         title="Opportunities per Region (AI Influenced vs Others)",
         barmode="stack",
-        labels={"Type": "Opportunity Type"}
+        labels={"Type": "Opportunity Type"},
+        color_discrete_map={
+            "Non_AI_Opps": "#006771",
+            "AI_Influenced_Opps": "#FF9999"
+        }
     )
 
-    # Set custom colors
-    fig_region.update_traces(marker_color=["#006771", "#FF9999"])
-
     st.plotly_chart(fig_region)
+
 
 
 
