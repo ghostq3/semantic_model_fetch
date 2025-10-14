@@ -95,7 +95,8 @@ with st.spinner("Fetching Power BI data automatically..."):
             "Won Opportunities", [Won Opps #],
             "Average Deal Size", [Average Deal Size],
             "AI Users", [AI Users],
-            "AI Invocations", [AI Invocations]
+            "AI Invocations", [AI Invocations],
+            "Win More", [Win More (Total Opportunities)]
         )
         """
         measures_df = dax_to_df(run_dax_query(token, dax_measures))
@@ -105,9 +106,19 @@ with st.spinner("Fetching Power BI data automatically..."):
     except Exception as e:
         st.error(f"❌ Failed to fetch data: {e}")
 
-# -------------------------------------
-# 🔹 Step 5. Example Visuals
-# -------------------------------------
+# ----------------------------
+# Streamlit App
+# ----------------------------
+st.set_page_config(page_title="AI KPI Dashboard", layout="wide")
+st.title("📊 AI KPI Dashboard")
+
+# KPIs
+col1, col2, col3, col4, col5 = st.columns(5)
+col1.metric("Win More", f"{"Win More":.1f}%")
+col2.metric("Win Rate", f"{"Win Rate":.1f}%")
+col3.metric("Avg Sales Cycle", f"{"Average Sales Cycle (Won)"} days")
+col4.metric("Avg Deal Size", f"${"Average Deal Size":,.0f}")
+col5.metric("AI Influenced Win Rate", f"{"AI Influenced Win Rate":.1f}%")
 
 # Example 1: Bar chart of opportunities by region
 if not fact_df.empty:
@@ -115,10 +126,4 @@ if not fact_df.empty:
     fig_region = px.histogram(fact_df, x="Region", title="Opportunities per Region")
     st.plotly_chart(fig_region)
 
-# Example 2: KPIs as metrics
-if not measures_df.empty:
-    st.subheader("📊 KPIs")
-    kpi_cols = st.columns(len(measures_df.columns))
-    for i, col in enumerate(measures_df.columns):
-        kpi_cols[i].metric(col, measures_df[col].iloc[0])
 
