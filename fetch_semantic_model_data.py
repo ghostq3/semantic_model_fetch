@@ -70,7 +70,7 @@ with st.spinner("Fetching Power BI data automatically..."):
         )
         """
         dim_date_df = dax_to_df(run_dax_query(token, dax_date))
-
+        dim_date_df.columns = dim_date_df.columns.str.replace(r"[\[\]]", "", regex=True)
         # ----- fact_opportunity -----
         dax_fact = """
         EVALUATE
@@ -99,7 +99,7 @@ with st.spinner("Fetching Power BI data automatically..."):
         )
         """
         measures_df = dax_to_df(run_dax_query(token, dax_measures))
-
+        measures_df.columns = measures_df.columns.str.replace(r"[\[\]]", "", regex=True)
         st.success("✅ Data & measures loaded successfully")
 
     except Exception as e:
