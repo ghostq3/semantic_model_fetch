@@ -126,10 +126,41 @@ col3.metric("Avg Sales Cycle", f"{avg_sales_cycle:.0f} days")
 col4.metric("Avg Deal Size", f"${avg_deal_size:,.0f}")
 col5.metric("AI Influenced Win Rate", f"{ai_influenced_win_rate:.1f}%")
 
-# Example 1: Bar chart of opportunities by region
+# Bar Chart Per Opp
 if not fact_df.empty:
-    st.subheader("🌍 Opportunities by Region")
-    fig_region = px.histogram(fact_df, x="Region", title="Opportunities per Region")
+    st.subheader("🌍 Opportunities by Region (Including AI Influenced)")
+
+    # Assume you have total opportunities per region and AI Influenced Win Rate
+    region_summary = fact_df.groupby("Region").agg(
+        Total_Opps=("Region", "count"),   # or a column counting opportunities
+    ).reset_index()
+
+    # Add AI-influenced opportunities using the win rate
+    region_summary["AI_Influenced_Opps"] = region_summary["Total_Opps"] * (measures_df.at[0, "AI Influenced Win Rate"])
+
+    # Remaining opportunities
+    region_summary["Non_AI_Opps"] = region_summary["Total_Opps"] - region_summary["AI_Influenced_Opps"]
+
+    # Melt for stacked bar
+    plot_df = region_summary.melt(
+        id_vars="Region",
+        value_vars=["Non_AI_Opps", "AI_Influenced_Opps"],
+        var_name="Type",
+        value_name="Opportunities"
+    )
+
+    # Plot
+    fig_region = px.bar(
+        plot_df,
+        x="Region",
+        y="Opportunities",
+        color="Type",
+        title="Opportunities per Region (AI Influenced vs Others)",
+        barmode="stack",
+        labels={"Type": "Opportunity Type"}
+    )
+
     st.plotly_chart(fig_region)
+
 
 
