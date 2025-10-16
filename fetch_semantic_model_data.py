@@ -105,7 +105,7 @@ with st.spinner("Fetching Power BI data automatically..."):
         st.error(f"❌ Failed to fetch data: {e}")
 
 #Measures
-st.write("fact_opportunity columns:", dim_emp_df.columns.tolist())
+# st.write("fact_opportunity columns:", dim_emp_df.columns.tolist())
 
 
 total_opportunities = fact_opp_df["OpportunityID"].nunique()
