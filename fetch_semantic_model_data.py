@@ -104,95 +104,95 @@ with st.spinner("Fetching Power BI data automatically..."):
     except Exception as e:
         st.error(f"❌ Failed to fetch data: {e}")
         
-st.write("fact_opportunity columns:", fact_opp_df.columns.tolist())
 
 
 
-# ---------- METRICS CALCULATION ----------
-# total_opportunities = fact_opp_df["OpportunityID"].nunique()
 
-# today = datetime.date.today()
-# won_opps_df = fact_opp_df[
-#     (fact_opp_df["LifecycleStatus"] == "Won") &
-#     (pd.to_datetime(fact_opp_df["CloseDate"]) <= pd.Timestamp(today))
-# ]
-# won_opps = len(won_opps_df)
 
-# ai_users = fact_chat_df["user_id"].nunique()
-# ai_user_emails = set(fact_chat_df["user_email"].dropna().unique())
+total_opportunities = fact_opp_df["OpportunityID"].nunique()
 
-# fact_opp_with_emp = fact_opp_df.merge(
-#     dim_emp_df[["Employee_ID", "Employee Email"]],
-#     how="left",
-#     left_on="EmployeeID",
-#     right_on="Employee_ID"
-# )
+today = datetime.date.today()
+won_opps_df = fact_opp_df[
+    (fact_opp_df["LifecycleStatus"] == "Won") &
+    (pd.to_datetime(fact_opp_df["CloseDate"]) <= pd.Timestamp(today))
+]
+won_opps = len(won_opps_df)
 
-# ai_influenced_df = fact_opp_with_emp[
-#     fact_opp_with_emp["Employee Email"].isin(ai_user_emails)
-# ]
+ai_users = fact_chat_df["user_id"].nunique()
+ai_user_emails = set(fact_chat_df["user_email"].dropna().unique())
 
-# won_count = (ai_influenced_df["LifecycleStatus"] == "Won").sum()
-# lost_count = (ai_influenced_df["LifecycleStatus"] == "Lost").sum()
+fact_opp_with_emp = fact_opp_df.merge(
+    dim_emp_df[["Employee_ID", "Employee Email"]],
+    how="left",
+    left_on="EmployeeID",
+    right_on="Employee_ID"
+)
 
-# ai_influenced_win_rate = (
-#     won_count / (won_count + lost_count) * 100
-#     if (won_count + lost_count) > 0 else 0
-# )
+ai_influenced_df = fact_opp_with_emp[
+    fact_opp_with_emp["Employee Email"].isin(ai_user_emails)
+]
 
-# def calc_close_rate(df):
-#     won = (df["LifecycleStatus"] == "Won").sum()
-#     lost = (df["LifecycleStatus"] == "Lost").sum()
-#     return won / (won + lost) if (won + lost) > 0 else 0
+won_count = (ai_influenced_df["LifecycleStatus"] == "Won").sum()
+lost_count = (ai_influenced_df["LifecycleStatus"] == "Lost").sum()
 
-# fact_opp_df["CloseDate"] = pd.to_datetime(fact_opp_df["CloseDate"])
-# fact_opp_df["Year"] = fact_opp_df["CloseDate"].dt.year
+ai_influenced_win_rate = (
+    won_count / (won_count + lost_count) * 100
+    if (won_count + lost_count) > 0 else 0
+)
 
-# current_year = fact_opp_df["Year"].max()
-# prev_year = current_year - 1
+def calc_close_rate(df):
+    won = (df["LifecycleStatus"] == "Won").sum()
+    lost = (df["LifecycleStatus"] == "Lost").sum()
+    return won / (won + lost) if (won + lost) > 0 else 0
 
-# current_rate = calc_close_rate(fact_opp_df[fact_opp_df["Year"] == current_year])
-# prev_rate = calc_close_rate(fact_opp_df[fact_opp_df["Year"] == prev_year])
+fact_opp_df["CloseDate"] = pd.to_datetime(fact_opp_df["CloseDate"])
+fact_opp_df["Year"] = fact_opp_df["CloseDate"].dt.year
 
-# close_rate_reduction = prev_rate - current_rate
+current_year = fact_opp_df["Year"].max()
+prev_year = current_year - 1
 
-# filtered_df = fact_opp_df[
-#     fact_opp_df["ReasonForStatus"] != "Closed...Too Many Days in a Single Sales Stage"
-# ]
+current_rate = calc_close_rate(fact_opp_df[fact_opp_df["Year"] == current_year])
+prev_rate = calc_close_rate(fact_opp_df[fact_opp_df["Year"] == prev_year])
 
-# won = (filtered_df["LifecycleStatus"] == "Won").sum()
-# lost = (filtered_df["LifecycleStatus"] == "Lost").sum()
+close_rate_reduction = prev_rate - current_rate
 
-# win_rate = won / (won + lost) if (won + lost) > 0 else 0
-# win_more = won / total_opportunities if total_opportunities > 0 else 0
-# avg_deal_size = fact_opp_df["NegotiatedValue"].mean()
+filtered_df = fact_opp_df[
+    fact_opp_df["ReasonForStatus"] != "Closed...Too Many Days in a Single Sales Stage"
+]
 
-# fact_opp_df["CreatedOn"] = pd.to_datetime(fact_opp_df["CreatedOn"])
-# fact_opp_df["CloseDate"] = pd.to_datetime(fact_opp_df["CloseDate"])
+won = (filtered_df["LifecycleStatus"] == "Won").sum()
+lost = (filtered_df["LifecycleStatus"] == "Lost").sum()
 
-# won_df = fact_opp_df[fact_opp_df["LifecycleStatus"] == "Won"].copy()
-# won_df["SalesCycleDays"] = (won_df["CloseDate"] - won_df["CreatedOn"]).dt.days
-# avg_sales_cycle_won = won_df["SalesCycleDays"].mean()
+win_rate = won / (won + lost) if (won + lost) > 0 else 0
+win_more = won / total_opportunities if total_opportunities > 0 else 0
+avg_deal_size = fact_opp_df["NegotiatedValue"].mean()
 
-# # Define all metrics in a dictionary
-# metrics = {
-#     "Total Opportunities": total_opportunities,
-#     "Won Opportunities": won_opps,
-#     "AI Users": ai_users,
-#     "AI Influenced Win Rate (%)": ai_influenced_win_rate,
-#     "Close Rate Reduction": close_rate_reduction,
-#     "Win Rate": win_rate,
-#     "Win More (%)": win_more * 100,
-#     "Average Deal Size": avg_deal_size,
-#     "Average Sales Cycle (Won)": avg_sales_cycle_won
-# }
+fact_opp_df["CreatedOn"] = pd.to_datetime(fact_opp_df["CreatedOn"])
+fact_opp_df["CloseDate"] = pd.to_datetime(fact_opp_df["CloseDate"])
 
-# # Display metrics dynamically
-# for k, v in metrics.items():
-#     if isinstance(v, float):
-#         st.metric(k, f"{v:,.2f}")
-#     else:
-#         st.metric(k, f"{v:,}")
+won_df = fact_opp_df[fact_opp_df["LifecycleStatus"] == "Won"].copy()
+won_df["SalesCycleDays"] = (won_df["CloseDate"] - won_df["CreatedOn"]).dt.days
+avg_sales_cycle_won = won_df["SalesCycleDays"].mean()
+
+# Define all metrics in a dictionary
+metrics = {
+    "Total Opportunities": total_opportunities,
+    "Won Opportunities": won_opps,
+    "AI Users": ai_users,
+    "AI Influenced Win Rate (%)": ai_influenced_win_rate,
+    "Close Rate Reduction": close_rate_reduction,
+    "Win Rate": win_rate,
+    "Win More (%)": win_more * 100,
+    "Average Deal Size": avg_deal_size,
+    "Average Sales Cycle (Won)": avg_sales_cycle_won
+}
+
+# Display metrics dynamically
+for k, v in metrics.items():
+    if isinstance(v, float):
+        st.metric(k, f"{v:,.2f}")
+    else:
+        st.metric(k, f"{v:,}")
 
 
 # ----------------------------
