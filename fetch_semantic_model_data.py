@@ -66,123 +66,133 @@ with st.spinner("Fetching Power BI data automatically..."):
             return df
 
         # ---------- DIMENSIONS ----------
-        dim_date_df = fetch_table("EVALUATE dim_date")
+        dax_date = "EVALUATE dim_date"
+        dim_date_df = fetch_table(dax_date)
         dim_date_df.columns = dim_date_df.columns.str.replace("dim_date", "", regex=False)
-
-        dim_emp_df = fetch_table("EVALUATE Dim_Emp_Hierarchy_SCD2")
+        
+        dax_emp = "EVALUATE Dim_Emp_Hierarchy_SCD2"
+        dim_emp_df = fetch_table(dax_emp)
         dim_emp_df.columns = dim_emp_df.columns.str.replace("Dim_Emp_Hierarchy_SCD2", "", regex=False)
-
-        dim_accounts_df = fetch_table("EVALUATE Dim_c4c_accounts")
+        
+        dax_accounts = "EVALUATE Dim_c4c_accounts"
+        dim_accounts_df = fetch_table(dax_accounts)
         dim_accounts_df.columns = dim_accounts_df.columns.str.replace("Dim_c4c_accounts", "", regex=False)
-
-        dim_product_df = fetch_table("EVALUATE Dim_ProductHierarchy")
+        
+        dax_product = "EVALUATE Dim_ProductHierarchy"
+        dim_product_df = fetch_table(dax_product)
         dim_product_df.columns = dim_product_df.columns.str.replace("Dim_ProductHierarchy", "", regex=False)
-
+        
+        
         # ---------- FACTS ----------
-        fact_chat_df = fetch_table("EVALUATE fact_chatlogs")
+        dax_chat = "EVALUATE fact_chatlogs"
+        fact_chat_df = fetch_table(dax_chat)
         fact_chat_df.columns = fact_chat_df.columns.str.replace("fact_chatlogs", "", regex=False)
-
-        fact_opp_df = fetch_table("EVALUATE fact_opportunity")
+        
+        dax_opp = "EVALUATE fact_opportunity"
+        fact_opp_df = fetch_table(dax_opp)
         fact_opp_df.columns = fact_opp_df.columns.str.replace("fact_opportunity", "", regex=False)
-
-        chat_feedback_df = fetch_table("EVALUATE chatfeedback")
+        
+        dax_feedback = "EVALUATE chatfeedback"
+        chat_feedback_df = fetch_table(dax_feedback)
         chat_feedback_df.columns = chat_feedback_df.columns.str.replace("chatfeedback", "", regex=False)
-
-        chat_analysis_df = fetch_table("EVALUATE chat_analysis")
+        
+        dax_analysis = "EVALUATE chat_analysis"
+        chat_analysis_df = fetch_table(dax_analysis)
         chat_analysis_df.columns = chat_analysis_df.columns.str.replace("chat_analysis", "", regex=False)
 
-        st.success("✅ Data fetched successfully")
 
     except Exception as e:
         st.error(f"❌ Failed to fetch data: {e}")
-        st.stop()  # ⛔ Stop execution here if data fetching fails
+        
+st.write("fact_opportunity columns:", fact_opp_df.columns.tolist())
+
 
 
 # ---------- METRICS CALCULATION ----------
-total_opportunities = fact_opp_df["OpportunityID"].nunique()
+# total_opportunities = fact_opp_df["OpportunityID"].nunique()
 
-today = datetime.date.today()
-won_opps_df = fact_opp_df[
-    (fact_opp_df["LifecycleStatus"] == "Won") &
-    (pd.to_datetime(fact_opp_df["CloseDate"]) <= pd.Timestamp(today))
-]
-won_opps = len(won_opps_df)
+# today = datetime.date.today()
+# won_opps_df = fact_opp_df[
+#     (fact_opp_df["LifecycleStatus"] == "Won") &
+#     (pd.to_datetime(fact_opp_df["CloseDate"]) <= pd.Timestamp(today))
+# ]
+# won_opps = len(won_opps_df)
 
-ai_users = fact_chat_df["user_id"].nunique()
-ai_user_emails = set(fact_chat_df["user_email"].dropna().unique())
+# ai_users = fact_chat_df["user_id"].nunique()
+# ai_user_emails = set(fact_chat_df["user_email"].dropna().unique())
 
-fact_opp_with_emp = fact_opp_df.merge(
-    dim_emp_df[["Employee_ID", "Employee Email"]],
-    how="left",
-    left_on="EmployeeID",
-    right_on="Employee_ID"
-)
+# fact_opp_with_emp = fact_opp_df.merge(
+#     dim_emp_df[["Employee_ID", "Employee Email"]],
+#     how="left",
+#     left_on="EmployeeID",
+#     right_on="Employee_ID"
+# )
 
-ai_influenced_df = fact_opp_with_emp[
-    fact_opp_with_emp["Employee Email"].isin(ai_user_emails)
-]
+# ai_influenced_df = fact_opp_with_emp[
+#     fact_opp_with_emp["Employee Email"].isin(ai_user_emails)
+# ]
 
-won_count = (ai_influenced_df["LifecycleStatus"] == "Won").sum()
-lost_count = (ai_influenced_df["LifecycleStatus"] == "Lost").sum()
+# won_count = (ai_influenced_df["LifecycleStatus"] == "Won").sum()
+# lost_count = (ai_influenced_df["LifecycleStatus"] == "Lost").sum()
 
-ai_influenced_win_rate = (
-    won_count / (won_count + lost_count) * 100
-    if (won_count + lost_count) > 0 else 0
-)
+# ai_influenced_win_rate = (
+#     won_count / (won_count + lost_count) * 100
+#     if (won_count + lost_count) > 0 else 0
+# )
 
-def calc_close_rate(df):
-    won = (df["LifecycleStatus"] == "Won").sum()
-    lost = (df["LifecycleStatus"] == "Lost").sum()
-    return won / (won + lost) if (won + lost) > 0 else 0
+# def calc_close_rate(df):
+#     won = (df["LifecycleStatus"] == "Won").sum()
+#     lost = (df["LifecycleStatus"] == "Lost").sum()
+#     return won / (won + lost) if (won + lost) > 0 else 0
 
-fact_opp_df["CloseDate"] = pd.to_datetime(fact_opp_df["CloseDate"])
-fact_opp_df["Year"] = fact_opp_df["CloseDate"].dt.year
+# fact_opp_df["CloseDate"] = pd.to_datetime(fact_opp_df["CloseDate"])
+# fact_opp_df["Year"] = fact_opp_df["CloseDate"].dt.year
 
-current_year = fact_opp_df["Year"].max()
-prev_year = current_year - 1
+# current_year = fact_opp_df["Year"].max()
+# prev_year = current_year - 1
 
-current_rate = calc_close_rate(fact_opp_df[fact_opp_df["Year"] == current_year])
-prev_rate = calc_close_rate(fact_opp_df[fact_opp_df["Year"] == prev_year])
+# current_rate = calc_close_rate(fact_opp_df[fact_opp_df["Year"] == current_year])
+# prev_rate = calc_close_rate(fact_opp_df[fact_opp_df["Year"] == prev_year])
 
-close_rate_reduction = prev_rate - current_rate
+# close_rate_reduction = prev_rate - current_rate
 
-filtered_df = fact_opp_df[
-    fact_opp_df["ReasonForStatus"] != "Closed...Too Many Days in a Single Sales Stage"
-]
+# filtered_df = fact_opp_df[
+#     fact_opp_df["ReasonForStatus"] != "Closed...Too Many Days in a Single Sales Stage"
+# ]
 
-won = (filtered_df["LifecycleStatus"] == "Won").sum()
-lost = (filtered_df["LifecycleStatus"] == "Lost").sum()
+# won = (filtered_df["LifecycleStatus"] == "Won").sum()
+# lost = (filtered_df["LifecycleStatus"] == "Lost").sum()
 
-win_rate = won / (won + lost) if (won + lost) > 0 else 0
-win_more = won / total_opportunities if total_opportunities > 0 else 0
-avg_deal_size = fact_opp_df["NegotiatedValue"].mean()
+# win_rate = won / (won + lost) if (won + lost) > 0 else 0
+# win_more = won / total_opportunities if total_opportunities > 0 else 0
+# avg_deal_size = fact_opp_df["NegotiatedValue"].mean()
 
-fact_opp_df["CreatedOn"] = pd.to_datetime(fact_opp_df["CreatedOn"])
-fact_opp_df["CloseDate"] = pd.to_datetime(fact_opp_df["CloseDate"])
+# fact_opp_df["CreatedOn"] = pd.to_datetime(fact_opp_df["CreatedOn"])
+# fact_opp_df["CloseDate"] = pd.to_datetime(fact_opp_df["CloseDate"])
 
-won_df = fact_opp_df[fact_opp_df["LifecycleStatus"] == "Won"].copy()
-won_df["SalesCycleDays"] = (won_df["CloseDate"] - won_df["CreatedOn"]).dt.days
-avg_sales_cycle_won = won_df["SalesCycleDays"].mean()
+# won_df = fact_opp_df[fact_opp_df["LifecycleStatus"] == "Won"].copy()
+# won_df["SalesCycleDays"] = (won_df["CloseDate"] - won_df["CreatedOn"]).dt.days
+# avg_sales_cycle_won = won_df["SalesCycleDays"].mean()
 
-# Define all metrics in a dictionary
-metrics = {
-    "Total Opportunities": total_opportunities,
-    "Won Opportunities": won_opps,
-    "AI Users": ai_users,
-    "AI Influenced Win Rate (%)": ai_influenced_win_rate,
-    "Close Rate Reduction": close_rate_reduction,
-    "Win Rate": win_rate,
-    "Win More (%)": win_more * 100,
-    "Average Deal Size": avg_deal_size,
-    "Average Sales Cycle (Won)": avg_sales_cycle_won
-}
+# # Define all metrics in a dictionary
+# metrics = {
+#     "Total Opportunities": total_opportunities,
+#     "Won Opportunities": won_opps,
+#     "AI Users": ai_users,
+#     "AI Influenced Win Rate (%)": ai_influenced_win_rate,
+#     "Close Rate Reduction": close_rate_reduction,
+#     "Win Rate": win_rate,
+#     "Win More (%)": win_more * 100,
+#     "Average Deal Size": avg_deal_size,
+#     "Average Sales Cycle (Won)": avg_sales_cycle_won
+# }
 
-# Display metrics dynamically
-for k, v in metrics.items():
-    if isinstance(v, float):
-        st.metric(k, f"{v:,.2f}")
-    else:
-        st.metric(k, f"{v:,}")
+# # Display metrics dynamically
+# for k, v in metrics.items():
+#     if isinstance(v, float):
+#         st.metric(k, f"{v:,.2f}")
+#     else:
+#         st.metric(k, f"{v:,}")
 
 
 # ----------------------------
