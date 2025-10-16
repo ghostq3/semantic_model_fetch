@@ -68,28 +68,38 @@ with st.spinner("Fetching Power BI data automatically..."):
         # ---------- DIMENSIONS ----------
         dax_date = "EVALUATE dim_date"
         dim_date_df = fetch_table(dax_date)
-
+        dim_date_df.columns = dim_date_df.columns.str.replace("dim_date", "", regex=False)
+        
         dax_emp = "EVALUATE Dim_Emp_Hierarchy_SCD2"
         dim_emp_df = fetch_table(dax_emp)
-
+        dim_emp_df.columns = dim_emp_df.columns.str.replace("Dim_Emp_Hierarchy_SCD2", "", regex=False)
+        
         dax_accounts = "EVALUATE Dim_c4c_accounts"
         dim_accounts_df = fetch_table(dax_accounts)
-
+        dim_accounts_df.columns = dim_accounts_df.columns.str.replace("Dim_c4c_accounts", "", regex=False)
+        
         dax_product = "EVALUATE Dim_ProductHierarchy"
         dim_product_df = fetch_table(dax_product)
-
+        dim_product_df.columns = dim_product_df.columns.str.replace("Dim_ProductHierarchy", "", regex=False)
+        
+        
         # ---------- FACTS ----------
         dax_chat = "EVALUATE fact_chatlogs"
         fact_chat_df = fetch_table(dax_chat)
-
+        fact_chat_df.columns = fact_chat_df.columns.str.replace("fact_chatlogs", "", regex=False)
+        
         dax_opp = "EVALUATE fact_opportunity"
         fact_opp_df = fetch_table(dax_opp)
-
+        fact_opp_df.columns = fact_opp_df.columns.str.replace("fact_opportunity", "", regex=False)
+        
         dax_feedback = "EVALUATE chatfeedback"
         chat_feedback_df = fetch_table(dax_feedback)
-
+        chat_feedback_df.columns = chat_feedback_df.columns.str.replace("chatfeedback", "", regex=False)
+        
         dax_analysis = "EVALUATE chat_analysis"
         chat_analysis_df = fetch_table(dax_analysis)
+        chat_analysis_df.columns = chat_analysis_df.columns.str.replace("chat_analysis", "", regex=False)
+
 
     except Exception as e:
         st.error(f"❌ Failed to fetch data: {e}")
